@@ -1,41 +1,52 @@
-{-# LANGUAGE InstanceSigs #-}
-
 module Zipa
-  ( compress,
+  ( -- todo,
+    -- compress,
     decompress,
   )
 where
 
+import Data.Bits (Bits (shiftL, (.|.)))
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Char8 as Char8
 import Data.Function ((&))
-import qualified Data.HashMap.Strict as HM
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import Data.List (intercalate, sortBy)
+import Data.Word (Word8)
+import qualified Zipa.PriorityQueue as PriorityQueue
+
+x = 
+  
 
 data Tree
-  = Node String Tree Tree
-  | Leaf Char
+  = Node [Word8] Tree Tree
+  | Leaf Word8
   deriving (Show)
 
-charFreqs :: String -> [(Char, Int)]
-charFreqs s = go s HM.empty & HM.toList & sortFreqs
-  where
-    go :: String -> HM.HashMap Char Int -> HM.HashMap Char Int
-    go [] hm = hm
-    go (c : cs) hm =
-      go cs $
-        if HM.member c hm
-          then HM.update (\i -> Just $ i + 1) c hm
-          else HM.insert c 1 hm
+type ByteFreqs = [(Word8, Int)]
 
-    sortFreqs :: [(Char, Int)] -> [(Char, Int)]
+byteFreqs :: ByteString -> ByteFreqs
+byteFreqs s = go (ByteString.unpack s) HashMap.empty & HashMap.toList & sortFreqs
+  where
+    go :: [Word8] -> HashMap Word8 Int -> HashMap Word8 Int
+    go [] hm = hm
+    go (b : bs) hm =
+      go bs $
+        if HashMap.member b hm
+          then HashMap.update (\i -> Just $ i + 1) b hm
+          else HashMap.insert b 1 hm
+
+    sortFreqs :: ByteFreqs -> ByteFreqs
     sortFreqs = sortBy (\(_, a) (_, b) -> compare a b)
 
-makeTree :: String -> Maybe Tree
-makeTree text = go chars
+-- makeTree :: ByteString -> Maybe Tree
+makeTree text = go
   where
-    chars :: String
-    chars = text & charFreqs & map fst
+    bytes :: ByteFreqs
+    bytes = text & byteFreqs
 
-    go :: String -> Maybe Tree
+    go :: [Word8] -> Maybe Tree
     go [] = Nothing
     go [c] = Just $ Leaf c
     go [a, b] = Just $ Node [a, b] (Leaf a) (Leaf b)
@@ -44,40 +55,62 @@ makeTree text = go chars
       rest <- go cs
       Just $ Node (a : b : cs) rest node
 
+-- todo :: IO ()
+-- todo =
+-- print $ makeTree (Char8.pack "aaaabbbcce")
+
 type Binary = [Bool]
 
 binaryToString :: Binary -> String
 binaryToString = concatMap (\bin -> if bin then "1" else "0")
 
-newtype Dict = Dict (HM.HashMap Char Binary)
+bitsToWord8 :: Binary -> Word8
+bitsToWord8 bits = foldl (\acc b -> (acc `shiftL` 1) .|. if b then 1 else 0) 0 (take 8 bits)
 
-instance Show Dict where
-  show :: Dict -> String
-  show (Dict dict) =
-    intercalate ";;" $ map (\(c, b) -> c : "::" <> binaryToString b) (HM.toList dict)
+bitsToByteString :: Binary -> ByteString
+bitsToByteString [] = ByteString.empty
+bitsToByteString bits =
+  let (byte, rest) = splitAt 8 bits
+   in ByteString.cons (bitsToWord8 byte) (bitsToByteString rest)
+
+newtype Dict = Dict (HashMap Word8 Binary)
+
+showDict :: Dict -> ByteString
+showDict (Dict dict) =
+  ByteString.intercalate (Char8.pack ";;") $ map (\(c, b) -> (ByteString.pack [c]) <> (Char8.pack "::") <> (bitsToByteString b)) (HashMap.toList dict)
 
 makeDict :: Tree -> Dict
-makeDict tree = Dict $ HM.fromList $ go tree []
+makeDict tree = Dict $ HashMap.fromList $ go tree []
   where
-    go :: Tree -> Binary -> [(Char, Binary)]
+    go :: Tree -> Binary -> [(Word8, Binary)]
     go (Leaf value) acc = [(value, acc)]
     go (Node _ a b) acc = go a (False : acc) ++ go b (True : acc)
 
-type Header = String
+-- compress :: ByteString -> ByteString
+-- compress text = case makeTree text of
+--   Nothing -> ByteString.empty
+--   Just tree ->
+--     let (Dict dict) = makeDict tree
+--         -- 1. todos os bits do input como [Bool]
+--         allBits :: Binary
+--         allBits =
+--           ByteString.foldr
+--             (\b acc -> maybe [] id (HashMap.lookup b dict) ++ acc)
+--             []
+--             text
+--         -- 2. empacota tudo junto
+--         compressed = bitsToByteString allBits
+--      in showDict (Dict dict) <> Char8.pack "##" <> compressed
 
-type Compressed = String
+-- Nothing -> ByteString.empty
+-- Just tree -> do
+--   let (Dict dict) = makeDict tree
+--       compressed =
+--         ByteString.concatMap
+--           (maybe (Char8.pack "") bitsToByteString . (`HashMap.lookup` dict))
+--           text
 
-compress :: String -> (Header, Compressed)
-compress text = case makeTree text of
-  Nothing -> ([], [])
-  Just tree -> do
-    let (Dict dict) = makeDict tree
-        compressed =
-          concatMap
-            (maybe "" binaryToString . (`HM.lookup` dict))
-            text
+--   showDict (Dict dict) <> Char8.pack "##" <> compressed
 
-    (show (Dict dict), compressed)
-
-decompress :: Compressed -> Maybe String
-decompress compressed = undefined
+decompress :: ByteString -> ByteString
+decompress = id
