@@ -5,6 +5,8 @@ module Zipa.MinHeap
     peek,
     poll,
     size,
+    from,
+    fromList,
   )
 where
 
@@ -32,3 +34,9 @@ poll :: MinHeap p v -> Maybe (v, MinHeap p v)
 poll mh = case BST.extract mh of
   Just ((_, v), rest) -> Just (v, rest)
   _ -> Nothing
+
+from :: (Ord p) => (p, v) -> MinHeap p v
+from = BST.fromBy (compare `on` fst)
+
+fromList :: (Ord p) => [(p, v)] -> MinHeap p v
+fromList = BST.fromListBy (compare `on` fst)

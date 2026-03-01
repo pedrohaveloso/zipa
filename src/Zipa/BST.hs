@@ -6,9 +6,11 @@ module Zipa.BST
     from,
     fromList,
     insert,
-    insertBy,
     merge,
     size,
+    fromBy,
+    fromListBy,
+    insertBy,
   )
 where
 
@@ -25,13 +27,6 @@ insert value (Node left leaf right)
   | leaf < value = Node left leaf (insert value right)
   | otherwise = Node (insert value left) leaf right
 insert value Empty = Node Empty value Empty
-
-insertBy :: (a -> a -> Ordering) -> a -> BST a -> BST a
-insertBy cmp value (Node left leaf right) =
-  case value `cmp` leaf of
-    LT -> Node (insertBy cmp value left) leaf right
-    _ -> Node left leaf (insertBy cmp value right)
-insertBy _ value Empty = Node Empty value Empty
 
 merge :: a -> BST a -> BST a -> BST a
 merge parent a = Node a parent
@@ -57,3 +52,18 @@ extract (Node Empty value right) = Just (value, right)
 extract (Node left value right) = do
   (value', left') <- extract left
   Just (value', Node left' value right)
+
+type Cmp a = (a -> a -> Ordering)
+
+insertBy :: Cmp a -> a -> BST a -> BST a
+insertBy cmp value (Node left leaf right) =
+  case value `cmp` leaf of
+    LT -> Node (insertBy cmp value left) leaf right
+    _ -> Node left leaf (insertBy cmp value right)
+insertBy _ value Empty = Node Empty value Empty
+
+fromBy :: Cmp a -> a -> BST a
+fromBy cmp = flip (insertBy cmp) empty
+
+fromListBy :: Cmp a -> [a] -> BST a
+fromListBy cmp = foldl (flip (insertBy cmp)) empty

@@ -14,11 +14,10 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.List (sortBy)
 import Data.Word (Word8)
-
-data Tree
-  = Node [Word8] Tree Tree
-  | Leaf Word8
-  deriving (Show)
+import Zipa.BST (BST)
+import qualified Zipa.BST as BST
+import Zipa.MinHeap (MinHeap)
+import qualified Zipa.MinHeap as MinHeap
 
 type ByteFreqs = [(Word8, Int)]
 
@@ -36,20 +35,12 @@ byteFreqs s = go (ByteString.unpack s) HashMap.empty & HashMap.toList & sortFreq
     sortFreqs :: ByteFreqs -> ByteFreqs
     sortFreqs = sortBy (\(_, a) (_, b) -> compare a b)
 
--- makeTree :: ByteString -> Maybe Tree
-makeTree text = go
-  where
-    bytes :: ByteFreqs
-    bytes = text & byteFreqs
-
-    go :: [Word8] -> Maybe Tree
-    go [] = Nothing
-    go [c] = Just $ Leaf c
-    go [a, b] = Just $ Node [a, b] (Leaf a) (Leaf b)
-    go (a : b : cs) = do
-      node <- go [a, b]
-      rest <- go cs
-      Just $ Node (a : b : cs) rest node
+makeQueue :: ByteString -> MinHeap Int (BST Word8)
+makeQueue text =
+  text
+    & byteFreqs
+    & map (\(w, i) -> (i, BST.from w))
+    & MinHeap.fromList
 
 -- todo :: IO ()
 -- todo =
@@ -71,32 +62,33 @@ bitsToByteString bits =
 
 newtype Dict = Dict (HashMap Word8 Binary)
 
-showDict :: Dict -> ByteString
-showDict (Dict dict) =
-  ByteString.intercalate (Char8.pack ";;") $ map (\(c, b) -> (ByteString.pack [c]) <> (Char8.pack "::") <> (bitsToByteString b)) (HashMap.toList dict)
+-- showDict :: Dict -> ByteString
+-- showDict (Dict dict) =
+--   ByteString.intercalate (Char8.pack ";;") $ map (\(c, b) -> (ByteString.pack [c]) <> (Char8.pack "::") <> (bitsToByteString b)) (HashMap.toList dict)
 
-makeDict :: Tree -> Dict
-makeDict tree = Dict $ HashMap.fromList $ go tree []
-  where
-    go :: Tree -> Binary -> [(Word8, Binary)]
-    go (Leaf value) acc = [(value, acc)]
-    go (Node _ a b) acc = go a (False : acc) ++ go b (True : acc)
+-- makeDict :: Tree -> Dict
+-- makeDict tree = Dict $ HashMap.fromList $ go tree []
+--   where
+--     go :: Tree -> Binary -> [(Word8, Binary)]
+--     go (Leaf value) acc = [(value, acc)]
+--     go (Node _ a b) acc = go a (False : acc) ++ go b (True : acc)
 
--- compress :: ByteString -> ByteString
--- compress text = case makeTree text of
---   Nothing -> ByteString.empty
---   Just tree ->
---     let (Dict dict) = makeDict tree
---         -- 1. todos os bits do input como [Bool]
---         allBits :: Binary
---         allBits =
---           ByteString.foldr
---             (\b acc -> maybe [] id (HashMap.lookup b dict) ++ acc)
---             []
---             text
---         -- 2. empacota tudo junto
---         compressed = bitsToByteString allBits
---      in showDict (Dict dict) <> Char8.pack "##" <> compressed
+compress :: ByteString -> ByteString
+compress text = do
+  let queue = makeQueue text
+
+  case makeQueue text of
+    Nothing -> ByteString.empty
+    Just tree ->
+      let (Dict dict) = makeDict tree
+          allBits :: Binary
+          allBits =
+            ByteString.foldr
+              (\b acc -> maybe [] id (HashMap.lookup b dict) ++ acc)
+              []
+              text
+          compressed = bitsToByteString allBits
+       in showDict (Dict dict) <> Char8.pack "##" <> compressed
 
 -- Nothing -> ByteString.empty
 -- Just tree -> do
