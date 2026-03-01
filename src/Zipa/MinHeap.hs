@@ -30,9 +30,9 @@ peek mh = case BST.first mh of
   Just (_, v) -> Just v
   _ -> Nothing
 
-poll :: MinHeap p v -> Maybe (v, MinHeap p v)
+poll :: MinHeap p v -> Maybe ((p, v), MinHeap p v)
 poll mh = case BST.extract mh of
-  Just ((_, v), rest) -> Just (v, rest)
+  Just (v, rest) -> Just (v, rest)
   _ -> Nothing
 
 from :: (Ord p) => (p, v) -> MinHeap p v
