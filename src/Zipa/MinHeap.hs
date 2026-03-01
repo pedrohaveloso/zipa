@@ -1,14 +1,34 @@
-{-# LANGUAGE InstanceSigs #-}
+module Zipa.MinHeap
+  ( MinHeap,
+    empty,
+    insert,
+    peek,
+    poll,
+    size,
+  )
+where
 
-module Zipa.MinHeap where
+import Data.Function (on)
+import Zipa.BST (BST)
+import qualified Zipa.BST as BST
 
-newtype Value a = Value (Int, a)
+type MinHeap p v = BST (p, v)
 
-instance Ord (Value a) where
-  compare :: Value a -> Value a -> Ordering
-  compare (Value (a, _)) (Value (b, _)) = compare a b
+empty :: MinHeap p v
+empty = BST.empty
 
-newtype MinHeap a = MinHeap (BinaryTree (Value a))
+size :: MinHeap p v -> Int
+size = BST.size
 
-insert :: MinHeap a -> Int -> a -> MinHeap a
-insert pq p value = undefined
+insert :: (Ord p) => (p, v) -> MinHeap p v -> MinHeap p v
+insert = BST.insertBy (compare `on` fst)
+
+peek :: MinHeap p v -> Maybe v
+peek mh = case BST.first mh of
+  Just (_, v) -> Just v
+  _ -> Nothing
+
+poll :: MinHeap p v -> Maybe (v, MinHeap p v)
+poll mh = case BST.extract mh of
+  Just ((_, v), rest) -> Just (v, rest)
+  _ -> Nothing

@@ -12,12 +12,8 @@ import qualified Data.ByteString.Char8 as Char8
 import Data.Function ((&))
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import Data.List (intercalate, sortBy)
+import Data.List (sortBy)
 import Data.Word (Word8)
-import qualified Zipa.PriorityQueue as PriorityQueue
-
-x = 
-  
 
 data Tree
   = Node [Word8] Tree Tree

@@ -25,7 +25,7 @@ source-repository head
 library
   exposed-modules:
       Zipa
-      Zipa.BinaryTree
+      Zipa.BST
       Zipa.MinHeap
   other-modules:
       Paths_zipa
