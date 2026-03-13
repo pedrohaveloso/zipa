@@ -38,21 +38,15 @@ byteFreqs s = go (ByteString.unpack s) HashMap.empty & HashMap.toList & sortFreq
 
 type Binary = [Bool]
 
-binaryToString :: Binary -> String
-binaryToString = concatMap (\bin -> if bin then "1" else "0")
-
-bitsToWord8 :: Binary -> Word8
-bitsToWord8 bits = foldl (\acc b -> (acc `shiftL` 1) .|. if b then 1 else 0) 0 (take 8 bits)
-
 bitsToByteString :: Binary -> ByteString
 bitsToByteString [] = ByteString.empty
 bitsToByteString bits =
   let (byte, rest) = splitAt 8 bits
-   in ByteString.cons (bitsToWord8 byte) (bitsToByteString rest)
-
-showDict :: Dict -> ByteString
-showDict (Dict dict) =
-  ByteString.intercalate (Char8.pack ";;") $ map (\(c, b) -> (ByteString.pack [c]) <> (Char8.pack "::") <> (bitsToByteString b)) (HashMap.toList dict)
+   in ByteString.cons (byteToWord8 byte) (bitsToByteString rest)
+  where
+    byteToWord8 :: Binary -> Word8
+    byteToWord8 byte =
+      foldl (\acc b -> (acc `shiftL` 1) .|. if b then 1 else 0) 0 (take 8 byte)
 
 type Queue = MinHeap Int (BST [Word8])
 
@@ -81,6 +75,7 @@ makeTree queue
   | otherwise = MinHeap.peek queue
 
 newtype Dict = Dict (HashMap Word8 Binary)
+  deriving (Show, Read)
 
 makeDict :: Tree -> Maybe Dict
 makeDict tree = case go tree [] of
@@ -89,12 +84,9 @@ makeDict tree = case go tree [] of
   where
     go :: Tree -> Binary -> Maybe [(Word8, Binary)]
     go BST.Empty _ = Nothing
-    -- todo head
-    go (BST.Node BST.Empty value BST.Empty) acc = pure [(head value, acc)]
-    go (BST.Node left _ right) acc = do
-      l <- go left (False : acc)
-      r <- go right (True : acc)
-      pure $ l ++ r
+    go (BST.Node BST.Empty [value] BST.Empty) acc = pure [(value, acc)]
+    go (BST.Node left _ right) acc =
+      liftA2 (++) (go left (False : acc)) (go right (True : acc))
 
 compress :: ByteString -> ByteString
 compress text = fromMaybe text compress'
@@ -109,22 +101,12 @@ compress text = fromMaybe text compress'
       let allBits :: Binary
           allBits =
             ByteString.foldr
-              (\b acc -> maybe [] id (HashMap.lookup b dict) ++ acc)
+              (\b acc -> fromMaybe [] (HashMap.lookup b dict) ++ acc)
               []
               text
           compressed = bitsToByteString allBits
 
-      pure $ showDict (Dict dict) <> Char8.pack "##" <> compressed
-
--- Nothing -> ByteString.empty
--- Just tree -> do
---   let (Dict dict) = makeDict tree
---       compressed =
---         ByteString.concatMap
---           (maybe (Char8.pack "") bitsToByteString . (`HashMap.lookup` dict))
---           text
-
---   showDict (Dict dict) <> Char8.pack "##" <> compressed
+      pure $ Char8.pack (show (Dict dict) <> "##") <> compressed
 
 decompress :: ByteString -> ByteString
 decompress = id
